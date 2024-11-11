@@ -13,6 +13,12 @@ ID_FIELD = 'id'
 CHOICES_FIELD = 'value-choices'
 KEY_FIELD = 'value-key'
 DESCRIPTION_FIELD = 'description'
+TYPE_FIELD = 'type'
+FLAG_FIELD = 'command-line-flag'
+
+TYPE_NUMBER = 'Number'
+TYPE_FLAG = "Flag"
+TYPE_STRING = "String"
 
 if __name__ == '__main__':
 
@@ -110,8 +116,9 @@ if __name__ == '__main__':
 
     # fix errors
     FIELDS_TO_CHECK = ["work_dir", "output_dir", "template"]
-    TO_RENAME_BY_PIPELINE = {'fmriprep': [('run_reconall','skip_reconall')]}
-    for input_object in new_descriptor.descriptor[INPUTS_FIELD]:
+    TO_RENAME_BY_PIPELINE = {'fmriprep': [('memory_gb', 'mem'), ('use_bbr', 'force_bbr'), ('run_reconall','fs_no_reconall'), ('run_msmsulc', 'no_msm'), ('hires', 'no_submm_recon'), ('regressors_all_comps', 'return_all_components')]}
+    I_INPUT_BBR = None  # may need to be deleted/replaced for fMRIPrep
+    for i_input, input_object in enumerate(new_descriptor.descriptor[INPUTS_FIELD]):
 
         # delete default values that are pathlib.Path objects
         for field_to_check in FIELDS_TO_CHECK:
@@ -149,6 +156,57 @@ if __name__ == '__main__':
         # add a dummy description if none is provided
         if input_object[DESCRIPTION_FIELD] is None:
             input_object[DESCRIPTION_FIELD] = 'No description provided.'
+
+        # tool-specific fixes
+        if tool_name == 'fmriprep':
+            # lists
+            if input_object[ID_FIELD] in ['output_spaces']:
+                input_object['list'] = True
+                print(f'Setting "list" field to True for {input_object[ID_FIELD]}')
+            # type
+            if input_object[ID_FIELD] in ['aggr_ses_reports']:
+                input_object[TYPE_FIELD] = TYPE_NUMBER
+                print(f'Setting "type" field to {TYPE_NUMBER} for {input_object[ID_FIELD]}')
+            if input_object[ID_FIELD] in ['no_msm', 'use_aroma', 'aroma_err_on_warn', 'fmap_no_demean', 'no_submm_recon', 'fs_no_reconall', 'version']:
+                input_object[TYPE_FIELD] = TYPE_FLAG
+                print(f'Setting "type" field to {TYPE_FLAG} for {input_object[ID_FIELD]}')
+                if DEFAULT_VALUE_FIELD in input_object:
+                    print(f'Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})')
+                    del input_object[DEFAULT_VALUE_FIELD]
+            if input_object[ID_FIELD] == 'verbose_count':
+                input_object[CHOICES_FIELD] = ['-v', '-vv', '-vvv']
+                print(f'Setting "choices" field for {input_object[ID_FIELD]}')
+                if FLAG_FIELD in input_object:
+                    print(f'Deleting flag for {input_object[ID_FIELD]} ({input_object[FLAG_FIELD]})')
+                    del input_object[FLAG_FIELD]
+            # fMRIPrep CLI has --force-bbr and --force-no-bbr flags
+            # they are both configured to have dest='use_bbr', and the Boutiques
+            # descriptor builder only keeps the first one
+            if input_object[ID_FIELD] == 'force_bbr':
+                I_INPUT_BBR = i_input
+
+        if input_object[TYPE_FIELD] == TYPE_FLAG and input_object.get(DEFAULT_VALUE_FIELD) is True:
+            print(f'WARNING: Flag with default value True, should check: {input_object[ID_FIELD]}')
+
+    if I_INPUT_BBR is not None:
+        print('Adding entry for --force-no-bbr')
+        # sanity check that the existing entry is what we think it is
+        if not new_descriptor.descriptor[INPUTS_FIELD][I_INPUT_BBR][FLAG_FIELD] == '--force-bbr':
+            print('WARNING: double-check the input item for "force_bbr" (unexpected flag)')
+        # add missed entry right after the existing one
+        existing_key = new_descriptor.descriptor[INPUTS_FIELD][I_INPUT_BBR][KEY_FIELD]
+        new_key = "[FORCE_NO_BBR]"
+        new_descriptor.descriptor[INPUTS_FIELD].insert(I_INPUT_BBR + 1, {
+            ID_FIELD: 'force_no_bbr',
+            NAME_FIELD: 'force_no_bbr',
+            DESCRIPTION_FIELD: 'Do not use boundary-based registration (no goodness-of-fit checks)',
+            TYPE_FIELD: TYPE_FLAG,
+            FLAG_FIELD: '--force-no-bbr',
+            "optional": True,
+            KEY_FIELD: new_key,
+        })
+        new_descriptor.descriptor[COMMAND_LINE_FIELD] = new_descriptor.descriptor[COMMAND_LINE_FIELD].replace(existing_key, f'{existing_key} {new_key}')
+        
 
     print('===== Saving =====')
     new_descriptor.save(fpath_out)
