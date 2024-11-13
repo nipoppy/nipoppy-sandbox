@@ -15,6 +15,7 @@ KEY_FIELD = 'value-key'
 DESCRIPTION_FIELD = 'description'
 TYPE_FIELD = 'type'
 FLAG_FIELD = 'command-line-flag'
+LIST_FIELD = 'list'
 
 TYPE_NUMBER = 'Number'
 TYPE_FLAG = "Flag"
@@ -115,7 +116,8 @@ if __name__ == '__main__':
     FIELDS_TO_CHECK = ["work_dir", "output_dir", "template"]
     TO_RENAME_BY_PIPELINE = {
         'fmriprep': [('memory_gb', 'mem'), ('use_bbr', 'force_bbr'), ('run_reconall','fs_no_reconall'), ('run_msmsulc', 'no_msm'), ('hires', 'no_submm_recon'), ('regressors_all_comps', 'return_all_components')],
-        'qsiprep': [('bids_filters', 'bids_filter_file'), ('memory_gb', 'mem')]
+        'qsiprep': [('bids_filters', 'bids_filter_file'), ('memory_gb', 'mem')],
+        'mriqc': [('memory_gb', 'mem')],
     }
     I_INPUT_BBR = None  # may need to be deleted/replaced for fMRIPrep
     for i_input, input_object in enumerate(new_descriptor.descriptor[INPUTS_FIELD]):
@@ -161,31 +163,37 @@ if __name__ == '__main__':
         if tool_name == 'fmriprep':
             # lists
             if input_object[ID_FIELD] in ['output_spaces']:
-                input_object['list'] = True
-                print(f'Setting "list" field to True for {input_object[ID_FIELD]}')
+                input_object[LIST_FIELD] = True
+                print(f'Setting "{LIST_FIELD}" field to True for {input_object[ID_FIELD]}')
             # type
             if input_object[ID_FIELD] in ['aggr_ses_reports']:
                 input_object[TYPE_FIELD] = TYPE_NUMBER
-                print(f'Setting "type" field to {TYPE_NUMBER} for {input_object[ID_FIELD]}')
+                print(f'Setting "{TYPE_FIELD}" field to {TYPE_NUMBER} for {input_object[ID_FIELD]}')
             if input_object[ID_FIELD] in ['no_msm', 'use_aroma', 'aroma_err_on_warn', 'fmap_no_demean', 'no_submm_recon', 'fs_no_reconall', 'version']:
                 input_object[TYPE_FIELD] = TYPE_FLAG
-                print(f'Setting "type" field to {TYPE_FLAG} for {input_object[ID_FIELD]}')
+                print(f'Setting "{TYPE_FIELD}" field to {TYPE_FLAG} for {input_object[ID_FIELD]}')
                 if DEFAULT_VALUE_FIELD in input_object:
                     print(f'Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})')
                     del input_object[DEFAULT_VALUE_FIELD]
-            # count-based behaviour
-            if input_object[ID_FIELD] == 'verbose_count':
-                input_object[CHOICES_FIELD] = ['-v', '-vv', '-vvv']
-                print(f'Setting "choices" field for {input_object[ID_FIELD]}')
-                if FLAG_FIELD in input_object:
-                    print(f'Deleting flag for {input_object[ID_FIELD]} ({input_object[FLAG_FIELD]})')
-                    del input_object[FLAG_FIELD]
             # fMRIPrep CLI has --force-bbr and --force-no-bbr flags
             # they are both configured to have dest='use_bbr', and the Boutiques
             # descriptor builder only keeps the first one
             if input_object[ID_FIELD] == 'force_bbr':
                 I_INPUT_BBR = i_input
-
+        if tool_name == 'mriqc':
+            if input_object[ID_FIELD] in ['version']:
+                input_object[TYPE_FIELD] = TYPE_FLAG
+                print(f'Setting "type" field to {TYPE_FLAG} for {input_object[ID_FIELD]}')
+                if DEFAULT_VALUE_FIELD in input_object:
+                    print(f'Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})')
+                    del input_object[DEFAULT_VALUE_FIELD]
+            if input_object[ID_FIELD] == 'analysis_level':
+                if LIST_FIELD in input_object:
+                    del input_object[LIST_FIELD]
+                    print(f'Deleting "{LIST_FIELD}" field for {input_object[ID_FIELD]}')
+            if input_object[ID_FIELD] == 'modalities':
+                input_object[LIST_FIELD] = True
+                print(f'Setting "{LIST_FIELD}" field to True for {input_object[ID_FIELD]}')
         if tool_name == 'qsiprep':
             # wrong type
             if input_object[ID_FIELD] in ['nprocs', 'omp_nthreads']:
@@ -197,7 +205,9 @@ if __name__ == '__main__':
                 if DEFAULT_VALUE_FIELD in input_object:
                     print(f'Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})')
                     del input_object[DEFAULT_VALUE_FIELD]
-            # count-based behaviour
+
+        # Nipreps tools 'verbose_count' input
+        if tool_name in ['fmriprep', 'mriqc', 'qsiprep']:
             if input_object[ID_FIELD] == 'verbose_count':
                 input_object[CHOICES_FIELD] = ['-v', '-vv', '-vvv']
                 print(f'Setting "choices" field for {input_object[ID_FIELD]}')
