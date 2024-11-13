@@ -110,20 +110,20 @@ if __name__ == '__main__':
     new_descriptor.descriptor[DESCRIPTION_FIELD] = tool_name
 
     # print(new_descriptor.descriptor)
-    for input_object in new_descriptor.descriptor[INPUTS_FIELD]:
-        if (DEFAULT_VALUE_FIELD in input_object) and isinstance(input_object[DEFAULT_VALUE_FIELD], Path):
-            print(input_object)
 
     # fix errors
     FIELDS_TO_CHECK = ["work_dir", "output_dir", "template"]
-    TO_RENAME_BY_PIPELINE = {'fmriprep': [('memory_gb', 'mem'), ('use_bbr', 'force_bbr'), ('run_reconall','fs_no_reconall'), ('run_msmsulc', 'no_msm'), ('hires', 'no_submm_recon'), ('regressors_all_comps', 'return_all_components')]}
+    TO_RENAME_BY_PIPELINE = {
+        'fmriprep': [('memory_gb', 'mem'), ('use_bbr', 'force_bbr'), ('run_reconall','fs_no_reconall'), ('run_msmsulc', 'no_msm'), ('hires', 'no_submm_recon'), ('regressors_all_comps', 'return_all_components')],
+        'qsiprep': [('bids_filters', 'bids_filter_file'), ('memory_gb', 'mem')]
+    }
     I_INPUT_BBR = None  # may need to be deleted/replaced for fMRIPrep
     for i_input, input_object in enumerate(new_descriptor.descriptor[INPUTS_FIELD]):
 
         # delete default values that are pathlib.Path objects
         for field_to_check in FIELDS_TO_CHECK:
             if input_object[ID_FIELD] == field_to_check and isinstance(input_object.get(DEFAULT_VALUE_FIELD), Path):
-                print(f"Deleting default value for {field_to_check}: {input_object[DEFAULT_VALUE_FIELD]}")
+                print(f"Deleting default value for {field_to_check} ({input_object[DEFAULT_VALUE_FIELD]})")
                 del input_object[DEFAULT_VALUE_FIELD]
 
         # rename some inputs
@@ -141,7 +141,7 @@ if __name__ == '__main__':
         
         # delete default values that are ==SUPPRESS==
         if input_object.get(DEFAULT_VALUE_FIELD) == "==SUPPRESS==":
-            print(f"Deleting default value for {input_object[ID_FIELD]}: {input_object[DEFAULT_VALUE_FIELD]}")
+            print(f"Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})")
             del input_object[DEFAULT_VALUE_FIELD]
 
         # remove choices that are None
@@ -173,6 +173,7 @@ if __name__ == '__main__':
                 if DEFAULT_VALUE_FIELD in input_object:
                     print(f'Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})')
                     del input_object[DEFAULT_VALUE_FIELD]
+            # count-based behaviour
             if input_object[ID_FIELD] == 'verbose_count':
                 input_object[CHOICES_FIELD] = ['-v', '-vv', '-vvv']
                 print(f'Setting "choices" field for {input_object[ID_FIELD]}')
@@ -185,8 +186,39 @@ if __name__ == '__main__':
             if input_object[ID_FIELD] == 'force_bbr':
                 I_INPUT_BBR = i_input
 
+        if tool_name == 'qsiprep':
+            # wrong type
+            if input_object[ID_FIELD] in ['nprocs', 'omp_nthreads']:
+                input_object[TYPE_FIELD] = TYPE_NUMBER
+            # flags
+            if input_object[ID_FIELD] in ['fmap_no_demean', 'version']:
+                input_object[TYPE_FIELD] = TYPE_FLAG
+                print(f'Setting "type" field to {TYPE_FLAG} for {input_object[ID_FIELD]}')
+                if DEFAULT_VALUE_FIELD in input_object:
+                    print(f'Deleting default value for {input_object[ID_FIELD]} ({input_object[DEFAULT_VALUE_FIELD]})')
+                    del input_object[DEFAULT_VALUE_FIELD]
+            # count-based behaviour
+            if input_object[ID_FIELD] == 'verbose_count':
+                input_object[CHOICES_FIELD] = ['-v', '-vv', '-vvv']
+                print(f'Setting "choices" field for {input_object[ID_FIELD]}')
+                if FLAG_FIELD in input_object:
+                    print(f'Deleting flag for {input_object[ID_FIELD]} ({input_object[FLAG_FIELD]})')
+                    del input_object[FLAG_FIELD]
+
+        if isinstance(input_object.get(DEFAULT_VALUE_FIELD), Path):
+            print(f'WARNING: pathlib.Path default value for {input_object[ID_FIELD]}: {input_object[DEFAULT_VALUE_FIELD]}')
+
+        if input_object[TYPE_FIELD] == TYPE_STRING and input_object.get(DEFAULT_VALUE_FIELD) is True:
+            print(f'WARNING: String with default value True, should check: {input_object[ID_FIELD]}')
+
         if input_object[TYPE_FIELD] == TYPE_FLAG and input_object.get(DEFAULT_VALUE_FIELD) is True:
             print(f'WARNING: Flag with default value True, should check: {input_object[ID_FIELD]}')
+
+        if FLAG_FIELD in input_object:
+            snake_case_flag = input_object[FLAG_FIELD].lstrip('-').replace('-', '_')
+            if snake_case_flag != input_object[ID_FIELD]:
+                print(f'WARNING: ID and flag do not match, rename {input_object[ID_FIELD]} -> {snake_case_flag}?')
+
 
     if I_INPUT_BBR is not None:
         print('Adding entry for --force-no-bbr')
