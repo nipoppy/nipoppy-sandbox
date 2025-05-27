@@ -145,6 +145,9 @@ def migrate_dataset(dpath_dataset: Path, dry_run: bool = False):
         print("The dataset seems to already have been migrated. Aborting.")
         return
 
+    # create empty dotnipoppy directory
+    (dpath_dataset / ".nipoppy").mkdir(exist_ok=True)
+
     # load the config file
     config: dict = json.loads(
         fpath_config.read_text().replace("UPDATE_DOUGHNUT", "UPDATE_STATUS")
