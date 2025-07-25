@@ -24,7 +24,7 @@ ENV PATH=/usr/local/go/bin:${PATH}
 # install apptainer from source
 #
 
-ARG MCONFIG_OPTIONS="--with-suid"
+ARG MCONFIG_OPTIONS="--without-suid"
 WORKDIR $GOPATH/src/github.com/apptainer
 
 RUN git clone https://github.com/apptainer/apptainer.git $GOPATH/src/github.com/apptainer
