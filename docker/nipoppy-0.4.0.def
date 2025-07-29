@@ -1,0 +1,39 @@
+Bootstrap: docker
+From: neurodebian:bookworm-non-free
+
+%post
+	apt update && apt upgrade && apt install -y autoconf automake build-essential cryptsetup cryptsetup-bin curl dh-apparmor fakeroot fuse2fs git fuse libfuse-dev libgpgme-dev libseccomp-dev libsubid-dev libtool pkg-config python3 python3.11-venv runc squashfs-tools squashfs-tools-ng tzdata uidmap uuid-dev wget zlib1g-dev
+
+	export GOVERSION=1.23.6 OS=linux ARCH=amd64
+
+	wget https://dl.google.com/go/go$GOVERSION.$OS-$ARCH.tar.gz
+	tar -C /usr/local -xzvf go$GOVERSION.$OS-$ARCH.tar.gz
+	rm go$GOVERSION.$OS-$ARCH.tar.gz
+
+	echo "export PATH=/usr/local/go/bin:${PATH}" >> $SINGULARITY_ENVIRONMENT
+	export PATH=/usr/local/go/bin:${PATH}
+
+	export APPVERSION=1.4.1
+	git clone https://github.com/apptainer/apptainer.git
+	cd apptainer && git checkout v${APPVERSION}
+
+	./mconfig && make -C builddir && make -C builddir install
+
+	cd ..
+	rm -rf apptainer
+
+	python3 -m venv /nipoppy
+
+	. /nipoppy/bin/activate
+
+	pip install --upgrade pip setuptools wheel
+	pip install nipoppy[all]==0.4.0
+
+	echo ". /nipoppy/bin/activate" >> $SINGULARITY_ENVIRONMENT
+
+%runscript
+	nipoppy
+
+%labels
+	Author bcmcpher@gmail.com
+	Version 0.4.0
