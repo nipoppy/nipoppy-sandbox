@@ -1,0 +1,47 @@
+{
+    "complete_single_shell_dwi" : {
+        "description": "Participants with only single-shell dwi data (i.e. acq: null)",
+        "scanner_metadata": {
+            "GE": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],
+            "Siemens": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],            
+            "Philips": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+        },        
+        "groupby_cols": ["sub", "ses", "datatype", "dir"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "scanner_metadata": {               
+            },
+            "datatypes": ["anat", "dwi"],
+            "protocol_spec":
+            [
+            { "dir": "LR", "n_acqs": 0, "n_runs": 1},
+            { "dir": "RL", "n_acqs": 0, "n_runs": 1}
+            ]
+        }
+    },
+
+    "complete_multi_shell_dwi" : {
+        "description": "Participants with only multi-shell dwi data (i.e. acq: not null)",
+        "scanner_metadata": {
+            "GE": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],
+            "Siemens": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],            
+            "Philips": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+        },        
+        "groupby_cols": ["sub", "ses", "datatype", "acq", "dir"],
+        "count_cols": ["run", "path"],
+        "criteria": {
+            "scanner_metadata": {
+                "Manufacturer": "Siemens"                
+            },
+            "datatypes": ["anat", "dwi"],
+            "protocol_spec":
+            [
+            {"acq": "B0", "dir": "AP", "n_runs": 4},
+            {"acq": "B0", "dir": "PA", "n_runs": 1},
+            {"acq": "B700", "dir": "PA", "n_runs": 1},
+            {"acq": "B1000", "dir": "PA", "n_runs": 1},
+            {"acq": "B2000", "dir": "PA", "n_runs": 1}
+            ]
+        }
+    }
+}
