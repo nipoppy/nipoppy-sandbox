@@ -8,20 +8,20 @@
         "count_cols": ["acq", "run", "path"],
         "criteria": {
             "extra_options": {
-                "force_exact_counts": false
+                "force_exact_counts": true
             },
-            "scanner_metadata": {               
+            "scanner_metadata": {
             },
             "datatypes": ["anat", "dwi"],
-            "protocol_spec":
+            "count_spec":
             [
-            { "dir": "LR", "n_acqs": 0, "n_runs": 1},
-            { "dir": "RL", "n_acqs": 0, "n_runs": 1}
+            { "dir": "LR", "n_acqs": 0},
+            { "dir": "RL", "n_acqs": 0}
             ]
         }
     },
 
-    "siemens_single_shell_dwi" : {
+    "Philips_single_shell_dwi" : {
         "description": "Participants with only single-shell dwi data (i.e. acq: null)",
         "scanner_metadata": {
             "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
@@ -30,7 +30,55 @@
         "count_cols": ["acq", "run", "path"],
         "criteria": {
             "extra_options": {
-                "force_exact_counts": false
+                "force_exact_counts": true
+            },
+            "scanner_metadata": {    
+                "sidecar_tags": {
+                    "Manufacturer": ["Philips"]
+                }           
+            },
+            "datatypes": ["anat", "dwi"],
+            "count_spec":
+            [
+            { "dir": "LR", "n_acqs": 0},
+            { "dir": "RL", "n_acqs": 0}
+            ]
+        }
+    },
+    "GE_single_shell_dwi" : {
+        "description": "Participants with only single-shell dwi data (i.e. acq: null)",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+        },        
+        "groupby_cols": ["sub", "ses", "datatype", "dir"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "extra_options": {
+                "force_exact_counts": true
+            },
+            "scanner_metadata": {    
+                "sidecar_tags": {
+                    "Manufacturer": ["GE"]
+                }           
+            },
+            "datatypes": ["anat", "dwi"],
+            "count_spec":
+            [
+            { "dir": "LR", "n_acqs": 0},
+            { "dir": "RL", "n_acqs": 0}
+            ]
+        }
+    },
+    "Siemens_single_shell_dwi" : {
+        "description": "Participants with only single-shell dwi data (i.e. acq: null)",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+        },        
+        "groupby_cols": ["sub", "ses", "datatype", "dir"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "extra_options": {
+                "force_exact_counts": true
             },
             "scanner_metadata": {    
                 "sidecar_tags": {
@@ -38,10 +86,10 @@
                 }           
             },
             "datatypes": ["anat", "dwi"],
-            "protocol_spec":
+            "count_spec":
             [
-            { "dir": "LR", "n_acqs": 0, "n_runs": 1},
-            { "dir": "RL", "n_acqs": 0, "n_runs": 1}
+            { "dir": "LR", "n_acqs": 0},
+            { "dir": "RL", "n_acqs": 0}
             ]
         }
     },
@@ -60,7 +108,7 @@
             "scanner_metadata": {
             },
             "datatypes": ["anat", "dwi"],
-            "protocol_spec":
+            "count_spec":
             [
             {"acq": "B0", "dir": "AP", "n_runs": 4},
             {"acq": "B0", "dir": "PA", "n_runs": 1},
