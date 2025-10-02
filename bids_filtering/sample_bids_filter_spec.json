@@ -9,6 +9,9 @@
         "groupby_cols": ["sub", "ses", "datatype", "dir"],
         "count_cols": ["acq", "run", "path"],
         "criteria": {
+            "extra_options": {
+                "force_exact_counts": false
+            },
             "scanner_metadata": {               
             },
             "datatypes": ["anat", "dwi"],
@@ -30,8 +33,10 @@
         "groupby_cols": ["sub", "ses", "datatype", "acq", "dir"],
         "count_cols": ["run", "path"],
         "criteria": {
+            "extra_options": {
+                "force_exact_counts": false
+            },
             "scanner_metadata": {
-                "Manufacturer": "Siemens"                
             },
             "datatypes": ["anat", "dwi"],
             "protocol_spec":

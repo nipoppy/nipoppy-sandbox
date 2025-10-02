@@ -17,7 +17,7 @@ def get_bids_df(ds_path, bids_table_index_path, read_bids_df=False, save_bids_df
     if read_bids_df:
         # read dataframe from csv
         print(f"Reading bids_df from {bids_table_index_path}")
-        bids_df = pd.read_csv(bids_table_index_path)
+        bids_df = pd.read_csv(bids_table_index_path, sep='\t')
 
     else:
         # index with b2t2
@@ -41,7 +41,7 @@ def get_scanner_metadata(ds_path, bids_df, bids_table_metadata_path, scanner_met
     if read_metadata_df:
         # read dataframe from csv
         print(f"Reading metadata_df from {bids_table_metadata_path}")
-        metadata_df = pd.read_csv(bids_table_metadata_path)
+        metadata_df = pd.read_csv(bids_table_metadata_path, sep='\t')
 
     else:
         # get single T1w json files from bids_df per participant (bids to table does not list jsons...)
@@ -123,7 +123,7 @@ def filter_by_metadata(metadata_df, metadata_criteria):
     filtered_df = metadata_df[metadata_df['sub'].isin(participants_with_metadata)]
     return filtered_df
 
-def filter_by_protocol_counts(count_df, protocol_spec, save_table_path=None):
+def filter_by_protocol_counts(count_df, protocol_spec, force_exact_counts=False, save_table_path=None):
     """
     Filter participants based on criteria dictionary.
     """
@@ -132,8 +132,12 @@ def filter_by_protocol_counts(count_df, protocol_spec, save_table_path=None):
     criteria = []
     for crit in protocol_spec:
         mask = np.array([True]*len(count_df))
-        for tag, value in crit.items():      
-            mask &= (count_df[tag] == value)
+        for tag, value in crit.items():    
+            if force_exact_counts:
+                mask &= (count_df[tag] == value) # exact match
+            else:
+                mask &= (count_df[tag] >= value) # greater than or equal to match
+                
         criteria.append(mask.copy())
 
     # check if all criteria are met for each participant and session
@@ -227,13 +231,9 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec, bids_
     metadata_df = get_scanner_metadata(bid_ds_path, bids_df, bids_table_metadata_path, scanner_metadata, read_metadata_df=read_metadata_df, save_metadata_df=save_metadata_df)
 
     # Start filtering
-    # filter bids_df by datatypes
-    datatypes = filter_spec["criteria"]["datatypes"]
-    filter_df = filter_by_datatype(bids_df, datatypes)
-    datatype_participants = filter_df['sub'].unique()
-
-    datatype_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='datatype_participants')
-    availability_df = availability_df.merge(datatype_availability_df, on='ses', how='left')
+    # check extra options
+    extra_options = filter_spec["criteria"]["extra_options"]
+    force_exact_counts = extra_options.get("force_exact_counts", False)
 
     # filter metadata_df by scanner metadata
     metadata_criteria = filter_spec["criteria"]["scanner_metadata"]
@@ -243,6 +243,14 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec, bids_
     metadata_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='metadata_participants')
     availability_df = availability_df.merge(metadata_availability_df, on='ses', how='left')
 
+    # filter bids_df by datatypes
+    datatypes = filter_spec["criteria"]["datatypes"]
+    filter_df = filter_by_datatype(bids_df, datatypes)
+    datatype_participants = filter_df['sub'].unique()
+
+    datatype_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='datatype_participants')
+    availability_df = availability_df.merge(datatype_availability_df, on='ses', how='left')
+   
     # Broader filter prior to count table based on datatype specific protocol counts
     count_participants = set(datatype_participants).intersection(set(metadata_participants))
     bids_df = bids_df[bids_df['sub'].isin(count_participants)]
@@ -261,7 +269,7 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec, bids_
 
     # apply criteria to filter participants
     save_table_path = f"{output_dir}/{bids_filter_spec_name}/filtered_participants.tsv"
-    filtered_df = filter_by_protocol_counts(count_df, protocol_spec, save_table_path=save_table_path)
+    filtered_df = filter_by_protocol_counts(count_df, protocol_spec, force_exact_counts, save_table_path=save_table_path)
     filtered_df[bids_filter_spec_name] = filtered_df['participants'].apply(len)
 
     # availability table with participant counts
