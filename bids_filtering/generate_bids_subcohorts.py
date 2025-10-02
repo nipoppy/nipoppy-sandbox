@@ -56,12 +56,11 @@ def get_scanner_metadata(ds_path, bids_df, bids_table_metadata_path, scanner_met
                 json_data = json.load(f)
             
             metadata = {}
-            for manufacturer, tags in scanner_metadata.items():
-                if json_data.get('Manufacturer', '').lower() == manufacturer.lower():
-                    for tag in tags:
-                        metadata[tag] = json_data.get(tag, None)
-                    break
-            
+            sidecar_tags = scanner_metadata.get("sidecar_tags", [])
+            if sidecar_tags:
+                for tag in sidecar_tags:
+                    metadata[tag] = json_data.get(tag, None)
+           
             # get sub and ses from path
             parts = json_file.split(os.sep)
             sub = [part.split("-")[1] for part in parts if part.startswith('sub-')]
@@ -118,7 +117,8 @@ def filter_by_metadata(metadata_df, metadata_criteria):
     """
     participants_with_metadata = metadata_df['sub'].unique()
     for tag, value in metadata_criteria.items():
-        participants_with_metadata = set(participants_with_metadata).intersection(set(metadata_df[metadata_df[tag] == value]['sub']))
+        print(f"Filtering by metadata tag: {tag} with value: {value}")
+        participants_with_metadata = set(participants_with_metadata).intersection(set(metadata_df[metadata_df[tag].isin(value)]['sub']))
 
     filtered_df = metadata_df[metadata_df['sub'].isin(participants_with_metadata)]
     return filtered_df
@@ -178,21 +178,12 @@ def save_participant_lists(count_df_filtered, criteria_name, output_dir):
     print(f"Participant list for each session saved to {output_dir}/{criteria_name}")
 
 
-def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec, bids_filter_spec_name, output_dir):
+def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, bids_filter_spec_name, output_dir):
     """
     Main function to run the filtering process.
     """
     bid_ds_path = f"{nipoppy_ds_path}/bids/"
     os.makedirs(output_dir, exist_ok=True)
-
-    # copy spec to output dir for reference
-    spec_dst = f"{output_dir}/bids_filter_spec.json"
-    if os.path.exists(bids_filter_spec_file):
-        os.system(f"cp {bids_filter_spec} {spec_dst}")
-        print(f"Filter spec copied to {spec_dst}")
-    else:
-        print(f"Filter spec file {bids_filter_spec} does not exist. Exiting.")
-        return
 
     # paths for intermediate files
     bids_table_index_path = f"{output_dir}/bids2table_index.tsv"
@@ -217,8 +208,7 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec, bids_
     availability_df = bids_df.groupby(['ses'])['sub'].nunique().reset_index(name='total_participants')
 
     # read filter specifications
-    filter_spec_path = f"{output_dir}/bids_filter_spec.json"
-    with open(filter_spec_path, 'r') as f:
+    with open(bids_filter_spec_file, 'r') as f:
         filter_spec_dict = json.load(f)  
 
     # select filter spec
@@ -236,7 +226,7 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec, bids_
     force_exact_counts = extra_options.get("force_exact_counts", False)
 
     # filter metadata_df by scanner metadata
-    metadata_criteria = filter_spec["criteria"]["scanner_metadata"]
+    metadata_criteria = filter_spec["criteria"]["scanner_metadata"]["sidecar_tags"]
     filter_df = filter_by_metadata(metadata_df, metadata_criteria)
     metadata_participants = filter_df['sub'].unique()
     

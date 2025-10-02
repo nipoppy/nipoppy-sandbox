@@ -2,9 +2,7 @@
     "complete_single_shell_dwi" : {
         "description": "Participants with only single-shell dwi data (i.e. acq: null)",
         "scanner_metadata": {
-            "GE": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],
-            "Siemens": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],            
-            "Philips": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
         },        
         "groupby_cols": ["sub", "ses", "datatype", "dir"],
         "count_cols": ["acq", "run", "path"],
@@ -23,13 +21,36 @@
         }
     },
 
+    "siemens_single_shell_dwi" : {
+        "description": "Participants with only single-shell dwi data (i.e. acq: null)",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+        },        
+        "groupby_cols": ["sub", "ses", "datatype", "dir"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "extra_options": {
+                "force_exact_counts": false
+            },
+            "scanner_metadata": {    
+                "sidecar_tags": {
+                    "Manufacturer": ["Siemens"]
+                }           
+            },
+            "datatypes": ["anat", "dwi"],
+            "protocol_spec":
+            [
+            { "dir": "LR", "n_acqs": 0, "n_runs": 1},
+            { "dir": "RL", "n_acqs": 0, "n_runs": 1}
+            ]
+        }
+    },
+
     "complete_multi_shell_dwi" : {
         "description": "Participants with only multi-shell dwi data (i.e. acq: not null)",
         "scanner_metadata": {
-            "GE": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],
-            "Siemens": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"],            
-            "Philips": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
-        },        
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName", "SeriesDescription"]
+        },       
         "groupby_cols": ["sub", "ses", "datatype", "acq", "dir"],
         "count_cols": ["run", "path"],
         "criteria": {
