@@ -26,10 +26,9 @@ def get_bids_df(ds_path, bids_table_index_path, read_bids_df=False, save_bids_df
         bids_df = tab.to_pandas(types_mapper=pd.ArrowDtype)
         bids_df = bids_df[PARSE_TAGS]
 
-        # ensure sub, ses, acq are strings
+        # ensure sub, ses are strings
         bids_df['sub'] = bids_df['sub'].astype(str)
-        bids_df['ses'] = bids_df['ses'].astype(str)
-        bids_df['acq'] = bids_df['acq'].astype(str)
+        bids_df['ses'] = bids_df['ses'].astype(str)        
 
         # save dataframe to csv
         if save_bids_df:        
@@ -79,6 +78,10 @@ def get_scanner_metadata(ds_path, bids_df, bids_table_metadata_path, scanner_met
 
         metadata_df = pd.DataFrame(metadata_list)
 
+        # ensure sub, ses are strings
+        metadata_df['sub'] = metadata_df['sub'].astype(str)
+        metadata_df['ses'] = metadata_df['ses'].astype(str)
+
         if save_metadata_df:
             metadata_df.to_csv(bids_table_metadata_path, index=False, sep='\t')
             print(f"Metadata dataframe saved to {bids_table_metadata_path}")
@@ -91,6 +94,7 @@ def create_count_table(bids_df, groupby_cols, count_cols, save_table_path=None):
     """
     print(f"Creating count table grouped by {groupby_cols} counting unique {count_cols}...")
     count_df = bids_df.groupby(groupby_cols)[count_cols].nunique().reset_index()    
+
     # rename count columns
     rename_dict = {col: f"n_{col}s" for col in count_cols}
     
@@ -202,6 +206,10 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     # create bids index table
     bids_df = get_bids_df(bid_ds_path, bids_table_index_path, read_bids_df=read_bids_df, save_bids_df=save_bids_df)
 
+    # cast sub, ses to string
+    bids_df['sub'] = bids_df['sub'].astype(str)
+    bids_df['ses'] = bids_df['ses'].astype(str)
+
     # number of participants
     n_subs = len(bids_df['sub'].unique())
     print(f"Number of participants: {n_subs}")    
@@ -222,6 +230,10 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     scanner_metadata = filter_spec["scanner_metadata"]["sidecar_tags"]
     metadata_df = get_scanner_metadata(bid_ds_path, bids_df, bids_table_metadata_path, scanner_metadata, read_metadata_df=read_metadata_df, save_metadata_df=save_metadata_df)
 
+    # cast sub, ses to string
+    metadata_df['sub'] = metadata_df['sub'].astype(str)
+    metadata_df['ses'] = metadata_df['ses'].astype(str)
+    
     # Start filtering
     # check extra options
     extra_options = filter_spec["criteria"]["extra_options"]
@@ -236,7 +248,7 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
         print("No scanner metadata criteria provided, skipping metadata filtering.")
         filter_df = metadata_df.copy()
 
-    metadata_participants = filter_df['sub'].astype(str).unique()
+    metadata_participants = filter_df['sub'].unique()
     
     metadata_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='metadata_participants')
     availability_df = availability_df.merge(metadata_availability_df, on='ses', how='left')
@@ -244,14 +256,14 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     # filter bids_df by datatypes
     datatypes = filter_spec["criteria"]["datatypes"]
     filter_df = filter_by_datatype(bids_df, datatypes)
-    datatype_participants = filter_df['sub'].astype(str).unique()
+    datatype_participants = filter_df['sub'].unique()
 
     datatype_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='datatype_participants')
     availability_df = availability_df.merge(datatype_availability_df, on='ses', how='left')
    
     # Broader filter prior to count table based on datatype specific protocol counts
     count_participants = set(datatype_participants).intersection(set(metadata_participants))
-    bids_df = bids_df[bids_df['sub'].astype(str).isin(count_participants)]
+    bids_df = bids_df[bids_df['sub'].isin(count_participants)]
 
     # create count table based groupby and count columns (this is meant for specific datatype protocol counts)
     save_table_path = f"{output_dir}/{bids_filter_spec_name}/count_table.tsv"
@@ -274,8 +286,6 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     availability_df = availability_df.merge(filtered_df[['ses', bids_filter_spec_name]], on='ses', how='left')
     availability_df = availability_df.set_index('ses').fillna(0).astype(int)
     print(availability_df)
-
-    # TODO add phase encoding direction criteria
 
     save_participant_lists(filtered_df, bids_filter_spec_name, output_dir)
 
