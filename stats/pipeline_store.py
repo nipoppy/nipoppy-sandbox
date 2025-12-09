@@ -17,9 +17,15 @@ else:
     size = 25
     headers = {}
 
+if community := os.getenv("ZENODO_COMMUNITY"):
+    print("Using Zenodo community:", community)
+    url = f"https://zenodo.org/api/communities/{community}/records"
+else:
+    url = "https://zenodo.org/api/records"
+
 print(f'Using Zenodo query string: "{query}"')
 response = httpx.get(
-    "https://zenodo.org/api/records",
+    url=url,
     headers=headers,
     params={
         "q": query,
