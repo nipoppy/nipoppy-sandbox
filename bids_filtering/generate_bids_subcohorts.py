@@ -106,15 +106,34 @@ def create_count_table(bids_df, groupby_cols, count_cols, save_table_path=None):
 
     return count_df
 
-def filter_by_datatype(bids_df, datatypes):
+def filter_by_datatype(bids_df, datatypes, match="AND"):
     """
     Filter dataframe based on specified datatypes.
+    match='AND': participant must have ALL specified datatypes.
+    match='OR' : participant must have AT LEAST ONE of the specified datatypes.
     """
     filtered_df = bids_df[bids_df['datatype'].isin(datatypes)]
-    participants_with_all_datatypes = filtered_df.groupby('sub')['datatype'].nunique()
-    participants_with_all_datatypes = participants_with_all_datatypes[participants_with_all_datatypes == len(datatypes)].index
+    if match.upper() == "AND":
+        qualifying = filtered_df.groupby('sub')['datatype'].nunique()
+        qualifying = qualifying[qualifying == len(datatypes)].index
+    else:  # OR
+        qualifying = filtered_df['sub'].unique()
+    filtered_df = filtered_df[filtered_df['sub'].isin(qualifying)]
+    return filtered_df
 
-    filtered_df = filtered_df[filtered_df['sub'].isin(participants_with_all_datatypes)]
+def filter_by_suffixes(bids_df, suffixes, match="AND"):
+    """
+    Filter participants based on specified suffixes.
+    match='AND': participant must have ALL specified suffixes.
+    match='OR' : participant must have AT LEAST ONE of the specified suffixes.
+    """
+    filtered_df = bids_df[bids_df['suffix'].isin(suffixes)]
+    if match.upper() == "AND":
+        qualifying = filtered_df.groupby('sub')['suffix'].nunique()
+        qualifying = qualifying[qualifying == len(suffixes)].index
+    else:  # OR
+        qualifying = filtered_df['sub'].unique()
+    filtered_df = filtered_df[filtered_df['sub'].isin(qualifying)]
     return filtered_df
 
 def filter_by_metadata(metadata_df, metadata_criteria):
@@ -194,8 +213,8 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     # paths for intermediate files
     bids_table_index_path = f"{output_dir}/bids2table_index.tsv"
     bids_table_metadata_path = f"{output_dir}/bids2table_metadata.tsv"
-    single_shell_table_path = f"{output_dir}/single_shell_table.tsv"
-    multi_shell_table_path = f"{output_dir}/multi_shell_table.tsv"
+    # single_shell_table_path = f"{output_dir}/single_shell_table.tsv"
+    # multi_shell_table_path = f"{output_dir}/multi_shell_table.tsv"
 
     # only save if not reading from preexisting files
     save_bids_df = not read_bids_df
@@ -255,14 +274,27 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
 
     # filter bids_df by datatypes
     datatypes = filter_spec["criteria"]["datatypes"]
-    filter_df = filter_by_datatype(bids_df, datatypes)
+    datatype_match = filter_spec["criteria"].get("datatype_match", "AND")
+    filter_df = filter_by_datatype(bids_df, datatypes, match=datatype_match)
     datatype_participants = filter_df['sub'].unique()
 
     datatype_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='datatype_participants')
     availability_df = availability_df.merge(datatype_availability_df, on='ses', how='left')
-   
+
+    # filter bids_df by suffixes
+    suffixes = filter_spec["criteria"].get("suffixes", [])
+    suffix_match = filter_spec["criteria"].get("suffix_match", "AND")
+    if suffixes:
+        suffix_filter_df = filter_by_suffixes(bids_df, suffixes, match=suffix_match)
+        suffix_participants = suffix_filter_df['sub'].unique()
+        suffix_availability_df = suffix_filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='suffix_participants')
+        availability_df = availability_df.merge(suffix_availability_df, on='ses', how='left')
+    else:
+        print("No suffix criteria provided, skipping suffix filtering.")
+        suffix_participants = bids_df['sub'].unique()
+
     # Broader filter prior to count table based on datatype specific protocol counts
-    count_participants = set(datatype_participants).intersection(set(metadata_participants))
+    count_participants = set(datatype_participants).intersection(set(metadata_participants)).intersection(set(suffix_participants))
     bids_df = bids_df[bids_df['sub'].isin(count_participants)]
 
     # create count table based groupby and count columns (this is meant for specific datatype protocol counts)

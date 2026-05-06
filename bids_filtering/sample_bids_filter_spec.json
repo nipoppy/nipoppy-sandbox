@@ -117,5 +117,30 @@
             {"acq": "B2000", "dir": "PA", "n_runs": 1}
             ]
         }
+    },
+
+    "complete_multi_modal_anat" : {
+        "description": "Participants who have ALL of T1w AND T2w AND FLAIR anatomical images (logical AND on suffix)",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName"]
+        },
+        "groupby_cols": ["sub", "ses", "suffix"],
+        "count_cols": ["path"],
+        "criteria": {
+            "extra_options": {
+                "force_exact_counts": false
+            },
+            "scanner_metadata": {
+            },
+            "datatypes": ["anat"],
+            "datatype_match": "AND",
+            "suffixes": ["T1w", "T2w", "FLAIR"],
+            "suffix_match": "AND",
+            "count_spec": [
+                {"suffix": "T1w", "n_paths": 1},
+                {"suffix": "T2w", "n_paths": 1},
+                {"suffix": "FLAIR", "n_paths": 1}
+            ]
+        }
     }
 }
