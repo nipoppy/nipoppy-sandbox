@@ -127,32 +127,6 @@
                 ]
             }
         }
-    },
-
-    "complete_multi_modal_anat" : {
-        "description": "Participants who have ALL of T1w AND FLAIR anatomical images (logical AND on suffix)",
-        "scanner_metadata": {
-            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName"]
-        },
-        "groupby_cols": ["sub", "ses", "suffix"],
-        "count_cols": ["acq", "run", "path"],
-        "criteria": {
-            "scanner_metadata": {},
-            "datatypes": {
-                "values": ["anat"],
-                "match": "AND"
-            },
-            "suffixes": {
-                "values": ["T1w", "FLAIR"],
-                "match": "AND"
-            },
-            "count_spec": {
-                "count_operator": "greater_or_equal_to",
-                "rules": [
-                    { "suffix": "T1w",   "n_path": 1 },
-                    { "suffix": "FLAIR", "n_path": 1 }
-                ]
-            }
-        }
     }
+
 }

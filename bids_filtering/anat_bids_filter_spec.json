@@ -1,0 +1,82 @@
+{
+    "exact_one_T1w_and_FLAIR" : {
+        "description": "Participants who have at least 1 T1w AND at least 1 FLAIR anatomical image",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName"]
+        },
+        "groupby_cols": ["sub", "ses", "suffix"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "scanner_metadata": {},
+            "datatypes": {
+                "values": ["anat"],
+                "match": "AND"
+            },
+            "suffixes": {
+                "values": ["T1w", "FLAIR"],
+                "match": "AND"
+            },
+            "count_spec": {
+                "count_operator": "equal_to",
+                "rules": [
+                    { "suffix": "T1w",   "n_path": 1 },
+                    { "suffix": "FLAIR", "n_path": 1 }
+                ]
+            }
+        }
+    },
+
+    "exact_two_T1w_and_FLAIR" : {
+        "description": "Participants who have exactly 2 T1w AND exactly 2 FLAIR anatomical images",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName"]
+        },
+        "groupby_cols": ["sub", "ses", "suffix"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "scanner_metadata": {},
+            "datatypes": {
+                "values": ["anat"],
+                "match": "AND"
+            },
+            "suffixes": {
+                "values": ["T1w", "FLAIR"],
+                "match": "AND"
+            },
+            "count_spec": {
+                "count_operator": "equal_to",
+                "rules": [
+                    { "suffix": "T1w",   "n_path": 2 },
+                    { "suffix": "FLAIR", "n_path": 2 }
+                ]
+            }
+        }
+    },
+
+    "atleast_three_T1w_and_FLAIR" : {
+        "description": "Participants who have at least 3 T1w AND at least 3 FLAIR anatomical images",
+        "scanner_metadata": {
+            "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName"]
+        },
+        "groupby_cols": ["sub", "ses", "suffix"],
+        "count_cols": ["acq", "run", "path"],
+        "criteria": {
+            "scanner_metadata": {},
+            "datatypes": {
+                "values": ["anat"],
+                "match": "AND"
+            },
+            "suffixes": {
+                "values": ["T1w", "FLAIR"],
+                "match": "AND"
+            },
+            "count_spec": {
+                "count_operator": "greater_or_equal_to",
+                "rules": [
+                    { "suffix": "T1w",   "n_path": 3 },
+                    { "suffix": "FLAIR", "n_path": 3 }
+                ]
+            }
+        }
+    }
+}

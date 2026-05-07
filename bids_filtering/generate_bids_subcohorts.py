@@ -240,7 +240,7 @@ def simulate_filter(filter_spec, bids_filter_spec_name):
     lines.append(f"Count table groupby columns : {spec.get('groupby_cols', [])}")
     lines.append(f"Count table count columns   : {spec.get('count_cols', [])}")
 
-    print("\n".join(lines))
+    return "\n".join(lines)
 
 
 def save_participant_lists(count_df_filtered, criteria_name, output_dir):
@@ -401,8 +401,17 @@ if __name__ == "__main__":
 
     filter_spec = filter_spec_dict[bids_filter_spec_name]
 
-    simulate_filter(filter_spec, bids_filter_spec_name)
+    description = simulate_filter(filter_spec, bids_filter_spec_name)
+    print(description)
+
     if not args.simulate:
+        if output_dir:
+            filter_output_dir = os.path.join(output_dir, bids_filter_spec_name)
+            os.makedirs(filter_output_dir, exist_ok=True)
+            desc_path = os.path.join(filter_output_dir, "filter_description.txt")
+            with open(desc_path, 'w') as f:
+                f.write(description + "\n")
+            print(f"Filter description saved to {desc_path}")
         run(ds_path, read_bids_df, read_metadata_df, filter_spec, bids_filter_spec_name, output_dir)
 
     
