@@ -1,6 +1,6 @@
 {
     "exact_one_T1w_and_FLAIR" : {
-        "description": "Participants who have at least 1 T1w AND at least 1 FLAIR anatomical image",
+        "description": "Participants who have exactly 1 T1w AND exactly 1 FLAIR anatomical image",
         "scanner_metadata": {
             "sidecar_tags": ["InstitutionName", "Manufacturer", "ManufacturersModelName"]
         },

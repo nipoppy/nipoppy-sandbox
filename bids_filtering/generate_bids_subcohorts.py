@@ -231,7 +231,7 @@ def simulate_filter(filter_spec, bids_filter_spec_name):
     op_str = "exactly" if count_operator == "equal_to" else "at least"
     lines.append(f"  [4] Protocol count filter (count_operator: {count_operator}):")
     lines.append(f"      A participant passes if they satisfy ANY ONE of the following rules")
-    lines.append(f"      (each rule's conditions are ALL required, threshold is {op_str}):")
+    lines.append(f"      (each rule's conditions are ALL required):")
     for i, rule in enumerate(rules, 1):
         conditions = ", ".join(f"{k} {op_str} {v}" for k, v in rule.items())
         lines.append(f"        Rule {i}: {conditions}")

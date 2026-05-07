@@ -87,8 +87,8 @@ python generate_bids_subcohorts.py \
 | `--bids_filter_spec_file` | Yes | Path to the JSON filter specification file |
 | `--bids_filter_spec_name` | Yes | Name of the filter to apply (top-level key in the JSON) |
 | `--output_dir` | Yes | Directory for output files |
-| `--read_bids_df` | No | Load the BIDS index from a previously saved TSV instead of re-indexing |
-| `--read_metadata_df` | No | Load the scanner metadata from a previously saved TSV instead of re-extracting |
+| `--read_bids_df` | No | Load the BIDS index from a previously saved TSV in the output dir instead of re-indexing |
+| `--read_metadata_df` | No | Load the scanner metadata from a previously saved TSV in the output dir instead of re-extracting |
 
 ---
 
