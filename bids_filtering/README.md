@@ -92,19 +92,75 @@ python generate_bids_subcohorts.py \
 
 ---
 
+## Filter Specification
+
+Each named filter in the JSON has the following structure:
+
+```jsonc
+{
+    "<filter_name>": {
+        "description": "Human-readable description",
+
+        // Scanner metadata tags to extract from T1w JSON sidecars
+        "scanner_metadata": {
+            "sidecar_tags": ["Manufacturer", "ManufacturersModelName"]
+        },
+
+        // Columns to group by when building the count table
+        "groupby_cols": ["sub", "ses", "datatype", "acq", "dir"],
+
+        // Columns to count unique values of within each group
+        "count_cols": ["run", "path"],
+
+        "criteria": {
+
+            // Scanner metadata filtering — leave empty {} to skip
+            "scanner_metadata": {
+                "sidecar_tags": {
+                    "Manufacturer": ["Siemens", "GE"]
+                }
+            },
+
+            // Datatype filter, grouped with its operator
+            "datatypes": {
+                "values": ["anat", "dwi"],
+                "match": "AND"         // "AND" (default) or "OR"
+            },
+
+            // Suffix filter, grouped with its operator — omit entire key to skip
+            "suffixes": {
+                "values": ["T1w", "T2w"],
+                "match": "AND"         // "AND" (default) or "OR"
+            },
+
+            // Protocol count filter, grouped with its threshold operator
+            "count_spec": {
+                "count_operator": "greater_or_equal_to",   // "greater_or_equal_to" (default, >=) or "equal_to" (exact match)
+                "rules": [
+                    {"acq": "B700", "dir": "PA", "n_run": 1},
+                    {"acq": "B1000", "dir": "PA", "n_run": 1}
+                ]
+            }
+        }
+    }
+}
+```
+
 ### Match gates (`AND` / `OR`)
 
 | Key | Applies to | AND (default) | OR |
 |-----|-----------|---------------|----|
-| `datatype_match` | `datatypes` list | Participant must have **all** listed datatypes | Participant must have **at least one** |
-| `suffix_match` | `suffixes` list | Participant must have **all** listed suffixes | Participant must have **at least one** |
+| `datatypes.match` | `datatypes.values` | Participant must have **all** listed datatypes | Participant must have **at least one** |
+| `suffixes.match` | `suffixes.values` | Participant must have **all** listed suffixes | Participant must have **at least one** |
 
 ### `count_spec` logic
 
-Each object in `count_spec` is a row-level AND filter applied to the count table. A participant/session row only needs to satisfy **one** of the objects (OR across items). The threshold comparison is controlled by `force_exact_counts`:
+Each object in `count_spec.rules` is a row-level AND filter applied to the count table. A participant/session row only needs to satisfy **one** rule (OR across rules). The threshold comparison is controlled by `count_operator`:
 
-- `false` (default): `n_<col> >= value`
-- `true`: `n_<col> == value`
+| Value | Behaviour |
+|---|---|
+| `"greater_or_equal_to"` (default) | `n_<col> >= value` — minimum threshold |
+| `"equal_to"` | `n_<col> == value` — exact match |
 
 ---
 

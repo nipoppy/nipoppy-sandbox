@@ -1,5 +1,4 @@
 import numpy as np
-import glob
 import pandas as pd
 import os 
 import argparse
@@ -55,7 +54,7 @@ def get_scanner_metadata(ds_path, bids_df, bids_table_metadata_path, scanner_met
 
         metadata_list = []
         for json_file in t1w_json_files:
-            json_file_path = f"{ds_path}/{json_file}"
+            json_file_path = os.path.join(ds_path, json_file)
             with open(json_file_path, 'r') as f:
                 json_data = json.load(f)
             
@@ -96,7 +95,7 @@ def create_count_table(bids_df, groupby_cols, count_cols, save_table_path=None):
     count_df = bids_df.groupby(groupby_cols)[count_cols].nunique().reset_index()    
 
     # rename count columns
-    rename_dict = {col: f"n_{col}s" for col in count_cols}
+    rename_dict = {col: f"n_{col}" for col in count_cols}
     
     count_df = count_df.rename(columns=rename_dict)
 
@@ -106,35 +105,19 @@ def create_count_table(bids_df, groupby_cols, count_cols, save_table_path=None):
 
     return count_df
 
-def filter_by_datatype(bids_df, datatypes, match="AND"):
+def filter_by_column_values(bids_df, column, values, match="AND"):
     """
-    Filter dataframe based on specified datatypes.
-    match='AND': participant must have ALL specified datatypes.
-    match='OR' : participant must have AT LEAST ONE of the specified datatypes.
+    Filter participants based on values in a given column.
+    match='AND': participant must have ALL specified values.
+    match='OR' : participant must have AT LEAST ONE of the specified values.
     """
-    filtered_df = bids_df[bids_df['datatype'].isin(datatypes)]
+    filtered_df = bids_df[bids_df[column].isin(values)]
     if match.upper() == "AND":
-        qualifying = filtered_df.groupby('sub')['datatype'].nunique()
-        qualifying = qualifying[qualifying == len(datatypes)].index
+        qualifying = filtered_df.groupby('sub')[column].nunique()
+        qualifying = qualifying[qualifying == len(values)].index
     else:  # OR
         qualifying = filtered_df['sub'].unique()
-    filtered_df = filtered_df[filtered_df['sub'].isin(qualifying)]
-    return filtered_df
-
-def filter_by_suffixes(bids_df, suffixes, match="AND"):
-    """
-    Filter participants based on specified suffixes.
-    match='AND': participant must have ALL specified suffixes.
-    match='OR' : participant must have AT LEAST ONE of the specified suffixes.
-    """
-    filtered_df = bids_df[bids_df['suffix'].isin(suffixes)]
-    if match.upper() == "AND":
-        qualifying = filtered_df.groupby('sub')['suffix'].nunique()
-        qualifying = qualifying[qualifying == len(suffixes)].index
-    else:  # OR
-        qualifying = filtered_df['sub'].unique()
-    filtered_df = filtered_df[filtered_df['sub'].isin(qualifying)]
-    return filtered_df
+    return filtered_df[filtered_df['sub'].isin(qualifying)]
 
 def filter_by_metadata(metadata_df, metadata_criteria):
     """
@@ -148,22 +131,25 @@ def filter_by_metadata(metadata_df, metadata_criteria):
     filtered_df = metadata_df[metadata_df['sub'].isin(participants_with_metadata)]
     return filtered_df
 
-def filter_by_protocol_counts(count_df, count_spec, force_exact_counts=False, save_table_path=None):
+def filter_by_protocol_counts(count_df, count_spec, count_operator="greater_or_equal_to", save_table_path=None):
     """
     Filter participants based on criteria dictionary.
+    count_operator='greater_or_equal_to': rule values are treated as minimums (n >= value).
+    count_operator='equal_to'           : rule values must match exactly (n == value).
     """
+    count_df = count_df.copy()
 
     # filter based on protocol specifications
     criteria = []
     for crit in count_spec:
-        mask = np.array([True]*len(count_df))
-        for tag, value in crit.items():    
-            if force_exact_counts:
+        mask = pd.Series(True, index=count_df.index)
+        for tag, value in crit.items():
+            if count_operator.lower() == "equal_to":
                 mask &= (count_df[tag] == value) # exact match
             else:
                 mask &= (count_df[tag] >= value) # greater than or equal to match
-                
-        criteria.append(mask.copy())
+
+        criteria.append(mask)
 
     # check if all criteria are met for each participant and session
     if len(criteria) > 0:
@@ -181,6 +167,82 @@ def filter_by_protocol_counts(count_df, count_spec, force_exact_counts=False, sa
     return count_df_filtered
 
 
+def simulate_filter(filter_spec, bids_filter_spec_name):
+    """
+    Print a plain-language description of the filtering criteria without running the pipeline.
+    """
+    spec = filter_spec
+    criteria = spec["criteria"]
+    lines = []
+
+    lines.append(f"Filter : {bids_filter_spec_name}")
+    lines.append(f"Description : {spec.get('description', '(none)')}")
+    lines.append("")
+    lines.append("Criteria (applied in order):")
+    lines.append("")
+
+    # 1. Scanner metadata
+    meta = criteria.get("scanner_metadata", {})
+    sidecar_tags = meta.get("sidecar_tags", {})
+    if sidecar_tags:
+        lines.append("  [1] Scanner metadata filter (from T1w JSON sidecars):")
+        for tag, values in sidecar_tags.items():
+            lines.append(f"        {tag} must be one of: {', '.join(values)}")
+    else:
+        lines.append("  [1] Scanner metadata filter: none (all scanners included)")
+    lines.append("")
+
+    # 2. Datatypes
+    datatype_spec = criteria.get("datatypes", {})
+    datatype_values = datatype_spec.get("values", [])
+    datatype_match = datatype_spec.get("match", "AND")
+    if datatype_values:
+        if datatype_match.upper() == "AND":
+            requirement = "participant must have ALL of the following datatypes"
+        else:
+            requirement = "participant must have AT LEAST ONE of the following datatypes"
+        lines.append(f"  [2] Datatype filter: {requirement}:")
+        for dt in datatype_values:
+            lines.append(f"        - {dt}")
+    else:
+        lines.append("  [2] Datatype filter: none")
+    lines.append("")
+
+    # 3. Suffixes
+    suffix_spec = criteria.get("suffixes", {})
+    suffix_values = suffix_spec.get("values", [])
+    suffix_match = suffix_spec.get("match", "AND")
+    if suffix_values:
+        if suffix_match.upper() == "AND":
+            requirement = "participant must have ALL of the following suffixes"
+        else:
+            requirement = "participant must have AT LEAST ONE of the following suffixes"
+        lines.append(f"  [3] Suffix filter: {requirement}:")
+        for s in suffix_values:
+            lines.append(f"        - {s}")
+    else:
+        lines.append("  [3] Suffix filter: none")
+    lines.append("")
+
+    # 4. Protocol count rules
+    count_spec_block = criteria.get("count_spec", {})
+    count_operator = count_spec_block.get("count_operator", "greater_or_equal_to")
+    rules = count_spec_block.get("rules", [])
+    op_str = "exactly" if count_operator == "equal_to" else "at least"
+    lines.append(f"  [4] Protocol count filter (count_operator: {count_operator}):")
+    lines.append(f"      A participant passes if they satisfy ANY ONE of the following rules")
+    lines.append(f"      (each rule's conditions are ALL required, threshold is {op_str}):")
+    for i, rule in enumerate(rules, 1):
+        conditions = ", ".join(f"{k} {op_str} {v}" for k, v in rule.items())
+        lines.append(f"        Rule {i}: {conditions}")
+
+    lines.append("")
+    lines.append(f"Count table groupby columns : {spec.get('groupby_cols', [])}")
+    lines.append(f"Count table count columns   : {spec.get('count_cols', [])}")
+
+    print("\n".join(lines))
+
+
 def save_participant_lists(count_df_filtered, criteria_name, output_dir):
     """
     Save participant lists to text files based on filtered count dataframe.
@@ -189,12 +251,12 @@ def save_participant_lists(count_df_filtered, criteria_name, output_dir):
         print(f"No participants found matching criteria: {criteria_name}")
         return
 
-    os.makedirs(f"{output_dir}/{criteria_name}", exist_ok=True)
+    os.makedirs(os.path.join(output_dir, criteria_name), exist_ok=True)
     sessions = count_df_filtered['ses'].tolist()
-    
+
     for ses in sessions:
         participants = count_df_filtered[count_df_filtered['ses'] == ses]['participants'].values[0]
-        participant_list_path = f"{output_dir}/{criteria_name}/participants_{ses}.txt"
+        participant_list_path = os.path.join(output_dir, criteria_name, f"participants_{ses}.txt")
         
         with open(participant_list_path, 'w') as f:
             for p in participants:
@@ -203,18 +265,16 @@ def save_participant_lists(count_df_filtered, criteria_name, output_dir):
     print(f"Participant list for each session saved to {output_dir}/{criteria_name}")
 
 
-def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, bids_filter_spec_name, output_dir):
+def run(nipoppy_ds_path, read_bids_df, read_metadata_df, filter_spec, bids_filter_spec_name, output_dir):
     """
     Main function to run the filtering process.
     """
-    bid_ds_path = f"{nipoppy_ds_path}/bids/"
+    bid_ds_path = os.path.join(nipoppy_ds_path, "bids")
     os.makedirs(output_dir, exist_ok=True)
 
     # paths for intermediate files
-    bids_table_index_path = f"{output_dir}/bids2table_index.tsv"
-    bids_table_metadata_path = f"{output_dir}/bids2table_metadata.tsv"
-    # single_shell_table_path = f"{output_dir}/single_shell_table.tsv"
-    # multi_shell_table_path = f"{output_dir}/multi_shell_table.tsv"
+    bids_table_index_path = os.path.join(output_dir, "bids2table_index.tsv")
+    bids_table_metadata_path = os.path.join(output_dir, "bids2table_metadata.tsv")
 
     # only save if not reading from preexisting files
     save_bids_df = not read_bids_df
@@ -231,19 +291,12 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
 
     # number of participants
     n_subs = len(bids_df['sub'].unique())
-    print(f"Number of participants: {n_subs}")    
+    print(f"Number of participants: {n_subs}")
 
     # Per session bids participant counts
     availability_df = bids_df.groupby(['ses'])['sub'].nunique().reset_index(name='total_participants')
 
-    # read filter specifications
-    with open(bids_filter_spec_file, 'r') as f:
-        filter_spec_dict = json.load(f)  
-
-    # select filter spec
-    filter_spec = filter_spec_dict[bids_filter_spec_name]
-
-    os.makedirs(f"{output_dir}/{bids_filter_spec_name}", exist_ok=True)
+    os.makedirs(os.path.join(output_dir, bids_filter_spec_name), exist_ok=True)
 
     # create scanner metadata table
     scanner_metadata = filter_spec["scanner_metadata"]["sidecar_tags"]
@@ -252,14 +305,10 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     # cast sub, ses to string
     metadata_df['sub'] = metadata_df['sub'].astype(str)
     metadata_df['ses'] = metadata_df['ses'].astype(str)
-    
+
     # Start filtering
-    # check extra options
-    extra_options = filter_spec["criteria"]["extra_options"]
-    force_exact_counts = extra_options.get("force_exact_counts", False)
 
     # filter metadata_df by scanner metadata
-    # check if sanner metadata criteria is provided
     if filter_spec["criteria"]["scanner_metadata"]:
         metadata_criteria = filter_spec["criteria"]["scanner_metadata"]["sidecar_tags"]
         filter_df = filter_by_metadata(metadata_df, metadata_criteria)
@@ -268,24 +317,23 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
         filter_df = metadata_df.copy()
 
     metadata_participants = filter_df['sub'].unique()
-    
+
     metadata_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='metadata_participants')
     availability_df = availability_df.merge(metadata_availability_df, on='ses', how='left')
 
     # filter bids_df by datatypes
-    datatypes = filter_spec["criteria"]["datatypes"]
-    datatype_match = filter_spec["criteria"].get("datatype_match", "AND")
-    filter_df = filter_by_datatype(bids_df, datatypes, match=datatype_match)
+    datatype_spec = filter_spec["criteria"]["datatypes"]
+    filter_df = filter_by_column_values(bids_df, 'datatype', datatype_spec["values"], match=datatype_spec.get("match", "AND"))
     datatype_participants = filter_df['sub'].unique()
 
     datatype_availability_df = filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='datatype_participants')
     availability_df = availability_df.merge(datatype_availability_df, on='ses', how='left')
 
     # filter bids_df by suffixes
-    suffixes = filter_spec["criteria"].get("suffixes", [])
-    suffix_match = filter_spec["criteria"].get("suffix_match", "AND")
-    if suffixes:
-        suffix_filter_df = filter_by_suffixes(bids_df, suffixes, match=suffix_match)
+    suffix_spec = filter_spec["criteria"].get("suffixes", {})
+    suffix_values = suffix_spec.get("values", [])
+    if suffix_values:
+        suffix_filter_df = filter_by_column_values(bids_df, 'suffix', suffix_values, match=suffix_spec.get("match", "AND"))
         suffix_participants = suffix_filter_df['sub'].unique()
         suffix_availability_df = suffix_filter_df.groupby(['ses'])['sub'].nunique().reset_index(name='suffix_participants')
         availability_df = availability_df.merge(suffix_availability_df, on='ses', how='left')
@@ -298,7 +346,7 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     bids_df = bids_df[bids_df['sub'].isin(count_participants)]
 
     # create count table based groupby and count columns (this is meant for specific datatype protocol counts)
-    save_table_path = f"{output_dir}/{bids_filter_spec_name}/count_table.tsv"
+    save_table_path = os.path.join(output_dir, bids_filter_spec_name, "count_table.tsv")
     count_df = create_count_table(
         bids_df,
         groupby_cols=filter_spec["groupby_cols"],
@@ -307,11 +355,13 @@ def run(nipoppy_ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, 
     )
 
     # get filter criteria
-    count_spec = filter_spec["criteria"]["count_spec"]
+    count_spec_block = filter_spec["criteria"]["count_spec"]
+    count_operator = count_spec_block.get("count_operator", "greater_or_equal_to")
+    count_spec = count_spec_block["rules"]
 
     # apply criteria to filter participants
-    save_table_path = f"{output_dir}/{bids_filter_spec_name}/filtered_participants.tsv"
-    filtered_df = filter_by_protocol_counts(count_df, count_spec, force_exact_counts, save_table_path=save_table_path)
+    save_table_path = os.path.join(output_dir, bids_filter_spec_name, "filtered_participants.tsv")
+    filtered_df = filter_by_protocol_counts(count_df, count_spec, count_operator, save_table_path=save_table_path)
     filtered_df[bids_filter_spec_name] = filtered_df['participants'].apply(len)
 
     # availability table with participant counts
@@ -332,15 +382,27 @@ if __name__ == "__main__":
     parser.add_argument('--bids_filter_spec_file', type=str, default=None, help='Path to the bids filter specification JSON file.')
     parser.add_argument('--bids_filter_spec_name', type=str, help='filter name from the specification file.')
     parser.add_argument('--output_dir', type=str, default=None, help='Path to save participant lists and tables.')
+    parser.add_argument('--simulate', action='store_true', help='Print filtering criteria in plain language without running the pipeline.')
     args = parser.parse_args()
 
     ds_path = args.ds_path
     read_bids_df = args.read_bids_df
     read_metadata_df = args.read_metadata_df
-    bids_filter_spec_file = args.bids_filter_spec_file
     bids_filter_spec_name = args.bids_filter_spec_name
     output_dir = args.output_dir
 
-    run(ds_path, read_bids_df, read_metadata_df, bids_filter_spec_file, bids_filter_spec_name, output_dir)
+    with open(args.bids_filter_spec_file, 'r') as f:
+        filter_spec_dict = json.load(f)
+
+    if bids_filter_spec_name not in filter_spec_dict:
+        print(f"ERROR: filter '{bids_filter_spec_name}' not found in {args.bids_filter_spec_file}.")
+        print(f"Available filters: {', '.join(filter_spec_dict.keys())}")
+        raise SystemExit(1)
+
+    filter_spec = filter_spec_dict[bids_filter_spec_name]
+
+    simulate_filter(filter_spec, bids_filter_spec_name)
+    if not args.simulate:
+        run(ds_path, read_bids_df, read_metadata_df, filter_spec, bids_filter_spec_name, output_dir)
 
     
