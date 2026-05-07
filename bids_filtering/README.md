@@ -94,73 +94,40 @@ python generate_bids_subcohorts.py \
 
 ## Filter Specification
 
-Each named filter in the JSON has the following structure:
+Filters are defined in a JSON file as named objects. See the following sample files for concrete examples:
 
-```jsonc
-{
-    "<filter_name>": {
-        "description": "Human-readable description",
+| File | Contents |
+|------|----------|
+| [`sample_bids_filter_spec.json`](sample_bids_filter_spec.json) | Scanner-agnostic DWI filters |
+| [`scanner_bids_filter_spec.json`](scanner_bids_filter_spec.json) | Scanner-specific DWI filters (Philips, GE, Siemens) |
+| [`anat_bids_filter_spec.json`](anat_bids_filter_spec.json) | Multi-modal anatomical filters |
 
-        // Scanner metadata tags to extract from T1w JSON sidecars
-        "scanner_metadata": {
-            "sidecar_tags": ["Manufacturer", "ManufacturersModelName"]
-        },
+Each filter supports:
 
-        // Columns to group by when building the count table
-        "groupby_cols": ["sub", "ses", "datatype", "acq", "dir"],
-
-        // Columns to count unique values of within each group
-        "count_cols": ["run", "path"],
-
-        "criteria": {
-
-            // Scanner metadata filtering — leave empty {} to skip
-            "scanner_metadata": {
-                "sidecar_tags": {
-                    "Manufacturer": ["Siemens", "GE"]
-                }
-            },
-
-            // Datatype filter, grouped with its operator
-            "datatypes": {
-                "values": ["anat", "dwi"],
-                "match": "AND"         // "AND" (default) or "OR"
-            },
-
-            // Suffix filter, grouped with its operator — omit entire key to skip
-            "suffixes": {
-                "values": ["T1w", "T2w"],
-                "match": "AND"         // "AND" (default) or "OR"
-            },
-
-            // Protocol count filter, grouped with its threshold operator
-            "count_spec": {
-                "count_operator": "greater_or_equal_to",   // "greater_or_equal_to" (default, >=) or "equal_to" (exact match)
-                "rules": [
-                    {"acq": "B700", "dir": "PA", "n_run": 1},
-                    {"acq": "B1000", "dir": "PA", "n_run": 1}
-                ]
-            }
-        }
-    }
-}
-```
+- **`description`** — human-readable label
+- **`scanner_metadata.sidecar_tags`** — list of T1w JSON sidecar tags to extract
+- **`groupby_cols`** / **`count_cols`** — columns for building the protocol count table
+- **`criteria`** — the filtering logic:
+  - **`scanner_metadata`** — filter by sidecar tag values; omit or leave `{}` to skip
+  - **`datatypes`** — `values` (list) + `match` (`"AND"` / `"OR"`)
+  - **`suffixes`** — `values` (list) + `match` (`"AND"` / `"OR"`); omit entire key to skip
+  - **`count_spec`** — `count_operator` (`"equal_to"` or `"greater_or_equal_to"`) + `rules` (list of column/threshold dicts)
 
 ### Match gates (`AND` / `OR`)
 
-| Key | Applies to | AND (default) | OR |
-|-----|-----------|---------------|----|
-| `datatypes.match` | `datatypes.values` | Participant must have **all** listed datatypes | Participant must have **at least one** |
-| `suffixes.match` | `suffixes.values` | Participant must have **all** listed suffixes | Participant must have **at least one** |
+| Key | AND (default) | OR |
+|-----|---------------|----|
+| `datatypes.match` | Participant must have **all** listed datatypes | Participant must have **at least one** |
+| `suffixes.match` | Participant must have **all** listed suffixes | Participant must have **at least one** |
 
 ### `count_spec` logic
 
-Each object in `count_spec.rules` is a row-level AND filter applied to the count table. A participant/session row only needs to satisfy **one** rule (OR across rules). The threshold comparison is controlled by `count_operator`:
+Rules are row-level AND conditions on the count table. A participant passes if they satisfy **any one** rule (OR across rules). The `count_operator` controls the threshold comparison:
 
 | Value | Behaviour |
 |---|---|
-| `"greater_or_equal_to"` (default) | `n_<col> >= value` — minimum threshold |
-| `"equal_to"` | `n_<col> == value` — exact match |
+| `"greater_or_equal_to"` (default) | `n_<col> >= value` |
+| `"equal_to"` | `n_<col> == value` |
 
 ---
 
@@ -181,17 +148,17 @@ python generate_bids_subcohorts.py \
 ```bash
 python generate_bids_subcohorts.py \
     --ds_path /data/my_study \
-    --bids_filter_spec_file sample_bids_filter_spec.json \
+    --bids_filter_spec_file scanner_bids_filter_spec.json \
     --bids_filter_spec_name Siemens_single_shell_dwi \
     --output_dir /data/my_study/subcohorts
 ```
 
-### Multi-modal anatomical (T1w AND T2w AND FLAIR)
+### Multi-modal anatomical (exactly 1 T1w AND 1 FLAIR)
 
 ```bash
 python generate_bids_subcohorts.py \
     --ds_path /data/my_study \
-    --bids_filter_spec_file sample_bids_filter_spec.json \
-    --bids_filter_spec_name complete_multi_modal_anat \
+    --bids_filter_spec_file anat_bids_filter_spec.json \
+    --bids_filter_spec_name exact_one_T1w_and_FLAIR \
     --output_dir /data/my_study/subcohorts
 ```
